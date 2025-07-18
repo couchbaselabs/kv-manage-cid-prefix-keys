@@ -1,5 +1,6 @@
 import array
 import json
+import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from datetime import timedelta
 from zlib import crc32
@@ -115,7 +116,7 @@ def get_xattrs(id, vbid):
         xattrs[xkey] = client.subdoc_get(key, xkey, 4)
     return xattrs
 
-def get_doc_ids():
+def query_doc_ids():
     kv_node = f'{kv_node_host}:{kv_node_port}'
     options = ClusterOptions(PasswordAuthenticator(username, password), tls_verify=TLSVerifyMode.NONE)
     options.apply_profile('wan_development')
@@ -141,11 +142,13 @@ def parse_args():
     parser.add_argument('--port', default=kv_node_port, type=check_port, help='KV node port (11210 or 11207 for TLS)')
     parser.add_argument('--host', default=kv_node_host, help='KV node hostname')
     parser.add_argument('--tls', default=kv_node_ssl, action='store_true')
+    parser.add_argument('--restore', action='store_true', help='Add docs removing the cid key prefix')
+    parser.add_argument('--delete', action='store_true', help='Delete docs with cid key prefix')
     parser.add_argument('--cid', default=collection_id, type=int)
+    parser.add_argument('--id', metavar='DOC_ID', action='append', help='Single doc id (can be used multiple times)')
+    parser.add_argument('--keys-file', metavar='FILE', dest='keys_file', help='JSON file with a list of doc ids with prefix')
     parser.add_argument('--search-all-vbs', dest='search_all_vbs', action='store_true', help='Search all vbuckets')
     parser.add_argument('--print-xattrs', dest='print_xattrs', action='store_true')
-    parser.add_argument('--delete', action='store_true', help='Delete docs with cid key prefix')
-    parser.add_argument('--restore', action='store_true', help='Add docs removing the cid key prefix')
     parser.add_argument('--add-test-doc', metavar='DOC_ID', dest='add_test_doc', help='Add a test doc with cid key prefix')
     return parser.parse_args()
 
@@ -161,8 +164,6 @@ def main():
     collection_id = options.cid
     search_all_vbs = options.search_all_vbs
     assert collection_id >= 0 and collection_id < 32
-    doc_ids = get_doc_ids()
-    print(f'Indexed {len(doc_ids)} cid-prefixed doc ids\n')
     connect_cluster()
     print()
     if options.add_test_doc is not None:
@@ -183,19 +184,34 @@ def main():
             print('Already exists', escaped_key)
         disconnect()
         return
+    if options.id:
+        doc_ids = options.id
+    elif options.keys_file is not None:
+        with open(options.keys_file, 'r') as f:
+            doc_ids = json.load(f)
+        if not isinstance(doc_ids, list):
+            print('Expected a list of doc ids in', options.keys_file)
+            sys.exit(1)
+    else:
+        doc_ids = query_doc_ids()
+        print('Indexed', len(doc_ids), 'cid-prefixed doc ids\n')
     not_found_count = 0
     already_exist_count = 0
     added_count = 0
     deleted_count = 0
+    prefix = encode_key('', collection_id).decode()
     for id in doc_ids:
+        assert isinstance(id, str)
         escaped_id = json.dumps(id)
+        if not id.startswith(prefix):
+            print('Skipping doc id not starting with prefix:', escaped_id)
+            continue
         docs = get_doc(id)
         if len(docs) == 0:
             print('Not found', escaped_id)
             not_found_count += 1
             continue
         docs.sort(reverse=True, key=lambda x: x[1]) # sort by cas
-        prefix = encode_key('', collection_id).decode(errors='ignore')
         restored_one = False
         for (doc, cas, flags, vbid) in docs:
             print('Got', escaped_id, 'cas:', cas, 'flags:', flags, 'vb:', vbid)
