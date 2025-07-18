@@ -296,10 +296,13 @@ class MemcachedClient(object):
     def _handleSingleResponse(self, myopaque):
         cmd, opaque, cas, keylen, extralen, data = self._handleKeyedResponse(myopaque)
         return opaque, cas, data
+    
+    def _getOpaque(self):
+        return self.r.randrange(1<<32)
 
     def _doCmd(self, cmd, key, val, extraHeader=b'', cas=0, collection=None):
         """Send a command and await its response."""
-        opaque=self.r.randint(0, 2**32)
+        opaque = self._getOpaque()
         self._sendCmd(cmd, key, val, opaque, extraHeader, cas, collection)
         return self._handleSingleResponse(opaque)
 
@@ -307,7 +310,7 @@ class MemcachedClient(object):
                   collection=None):
         """Send an alternative format command (with flex framing extras) and
            await its response."""
-        opaque = self.r.randint(0, 2 ** 32)
+        opaque = self._getOpaque()
         self._sendAltCmd(cmd, flex, key, val, opaque, extraHeader, cas,
                          collection=collection)
         return self._handleSingleResponse(opaque)
@@ -412,7 +415,7 @@ class MemcachedClient(object):
         return self._mutate(memcacheConstants.CMD_ADD, key, exp, flags, 0, val, collection)
     
     def add_with_dtype(self, key, exp, flags, val, dtype, collection=None):
-        opaque = self.r.randint(0, 2**32)
+        opaque = self._getOpaque()
         extraHeader = struct.pack(SET_PKT_FMT, flags, exp)
         self._sendMsg(memcacheConstants.CMD_ADD, key, val, opaque, extraHeader=extraHeader,
                       dtype=dtype, vbucketId=self.vbucketId, collection=collection)
@@ -667,7 +670,7 @@ class MemcachedClient(object):
 
     def stats(self, sub='', val=''):
         """Get stats."""
-        opaque=self.r.randint(0, 2**32)
+        opaque = self._getOpaque()
         dtype = DTYPE_RAW
         if len(val) > 0:
             dtype = DTYPE_JSON
@@ -687,7 +690,7 @@ class MemcachedClient(object):
         return rv
 
     def get_random_key(self):
-        opaque=self.r.randint(0, 2**32)
+        opaque = self._getOpaque()
         self._sendCmd(memcacheConstants.CMD_GET_RANDOM_KEY, '', '', opaque)
         cmd, opaque, cas, klen, extralen, data = self._handleKeyedResponse(None)
         rv = {}
