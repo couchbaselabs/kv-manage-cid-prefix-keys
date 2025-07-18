@@ -184,8 +184,9 @@ def main():
             print('Already exists', escaped_key)
         disconnect()
         return
+    prefix = encode_key('', collection_id).decode()
     if options.id:
-        doc_ids = options.id
+        doc_ids = [prefix + id for id in options.id]
     elif options.keys_file is not None:
         with open(options.keys_file, 'r') as f:
             doc_ids = json.load(f)
@@ -199,7 +200,6 @@ def main():
     already_exist_count = 0
     added_count = 0
     deleted_count = 0
-    prefix = encode_key('', collection_id).decode()
     for id in doc_ids:
         assert isinstance(id, str)
         escaped_id = json.dumps(id)
