@@ -138,7 +138,7 @@ def parse_args():
     parser = ArgumentParser(allow_abbrev=False)
     parser.add_argument('-b', '--bucket', default=bucket_name)
     parser.add_argument('-u', '--username', default=username)
-    parser.add_argument('-p', '--password', default=password)
+    parser.add_argument('-p', '--password', default=password, help='"" for password prompt')
     parser.add_argument('--port', default=kv_node_port, type=check_port, help='KV node port (11210 or 11207 for TLS)')
     parser.add_argument('--host', default=kv_node_host, help='KV node hostname')
     parser.add_argument('--tls', default=kv_node_ssl, action='store_true')
@@ -164,6 +164,9 @@ def main():
     collection_id = options.cid
     search_all_vbs = options.search_all_vbs
     assert collection_id >= 0 and collection_id < 32
+    if len(password) == 0:
+        import getpass
+        password = getpass.getpass()
     connect_cluster()
     print()
     if options.add_test_doc is not None:
