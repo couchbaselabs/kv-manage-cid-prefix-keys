@@ -177,12 +177,6 @@ def main():
             vbid = get_vbid(id)
             add_doc(key, 0, '{}', 0, vbid)
             print('Added test doc', escaped_key, 'vb:', vbid)
-            vbid = get_vbid(key)
-            add_doc(key, 0, '{}', 0, vbid)
-            print('Added test doc', escaped_key, 'vb:', vbid)
-            vbid = get_vbid(b'\0' + key)
-            add_doc(key, 0, '{}', 0, vbid)
-            print('Added test doc', escaped_key, 'vb:', vbid)
         except mc_bin_client.ErrorKeyEexists:
             print('Already exists', escaped_key)
         disconnect()
